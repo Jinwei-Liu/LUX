@@ -165,7 +165,7 @@ class ActorCriticNet(nn.Module):
         self.load_state_dict(checkpoint['model_state_dict'])
         return self
     
-def train_actor_critic(model, optimizer, replay_buffer, batch_size, gamma=0.9, CLIP_EPS = 0.2, entropy_coef=0.001): #gama两个地方有
+def train_actor_critic(model, optimizer, replay_buffer, batch_size, gamma=0.95, CLIP_EPS = 0.2, entropy_coef=0.001*0): #gama两个地方有
     # 从 ReplayBuffer 采样
     data = replay_buffer.sample(batch_size) 
     states, actions, rewards, dones, next_states, log_prob, advantages = data

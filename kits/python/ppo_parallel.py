@@ -17,7 +17,7 @@ import time
 from queue import Full
 from ppo import *
 from datetime import datetime
-def compute_gae_for_episode(episode_buffer, gamma=0.99, gae_lambda=0.95):
+def compute_gae_for_episode(episode_buffer, gamma=0.95, gae_lambda=0.95):
     """
     输入:
         episode_buffer: 本回合的所有transition列表，
@@ -167,7 +167,7 @@ def main():
 
     # 初始化模型
     model = ActorCriticNet(input_shape=(169, 24, 24), num_actions=3, device=device).to(device)
-    model.load_model('/home/kenway/Lux_AI/save_model/actor_critic_model_1000.pth')
+    # model.load_model('LUX/kits/python/actor_critic_model_1000.pth')
     local_model = ActorCriticNet(input_shape=(169, 24, 24), num_actions=3, device="cpu")
     local_model.load_state_dict(model.state_dict())
     local_model.share_memory()  # 共享模型参数

@@ -375,70 +375,70 @@ class ProcessObservation:
         # # 只有第二轮有这个奖励
         # if steps > 101:
 
-        #------------------课程二的内容-------------
-        # 如果在奖励点就单独给奖励
-        reward_map_copy = copy.deepcopy(reward_map) #防止多次领取奖励
-        # 遍历每个单位
-        for unit_index in range(unit_num):
-            # 检查 mask 是否激活
-            if unit_mask[self.team_id, unit_index]:  # 如果存在单位
-                # 获取单位的位置
-                x, y = unit_positions[self.team_id, unit_index]
-                if reward_map_copy[x, y] == 1:
-                    reward_return_list[unit_index] += 200 #单独给奖励
-                    reward_map_copy[x, y] = 0
-                # elif (reward_map_copy[x, y] == 0) and (reward_map[x, y] == 1):
-                #     reward_return_list[unit_index] -= 50 #惩罚一下
+        # #------------------课程二的内容-------------
+        # # 如果在奖励点就单独给奖励
+        # reward_map_copy = copy.deepcopy(reward_map) #防止多次领取奖励
+        # # 遍历每个单位
+        # for unit_index in range(unit_num):
+        #     # 检查 mask 是否激活
+        #     if unit_mask[self.team_id, unit_index]:  # 如果存在单位
+        #         # 获取单位的位置
+        #         x, y = unit_positions[self.team_id, unit_index]
+        #         if reward_map_copy[x, y] == 1:
+        #             reward_return_list[unit_index] += 200 #单独给奖励
+        #             reward_map_copy[x, y] = 0
+        #         # elif (reward_map_copy[x, y] == 0) and (reward_map[x, y] == 1):
+        #         #     reward_return_list[unit_index] -= 50 #惩罚一下
 
-        # 通过遗迹点设置奖励场
-        reward_map_to_relic = np.zeros_like(relic_map, dtype=float)
-        # 获取所有奖励点的位置
-        reward_points = np.argwhere(relic_map == 1)
+        # # 通过遗迹点设置奖励场
+        # reward_map_to_relic = np.zeros_like(relic_map, dtype=float)
+        # # 获取所有奖励点的位置
+        # reward_points = np.argwhere(relic_map == 1)
 
-        # 计算每个点的奖励值
-        rows, cols = reward_map_to_relic.shape
-        for i in range(rows):
-            for j in range(cols):
-                # 计算当前点到所有奖励点的曼哈顿距离
-                distances = np.abs(reward_points[:, 0] - i) + np.abs(reward_points[:, 1] - j)
-                # 设置奖励值，距离越近奖励越高
-                if distances.size > 0:
-                    reward_map_to_relic[i, j] = 1 / (1 + np.min(distances)) * 10
-                else:
-                    # 处理 distances 为空的情况，例如设置默认值或跳过当前计算
-                    reward_map_to_relic[i, j] = 0 
+        # # 计算每个点的奖励值
+        # rows, cols = reward_map_to_relic.shape
+        # for i in range(rows):
+        #     for j in range(cols):
+        #         # 计算当前点到所有奖励点的曼哈顿距离
+        #         distances = np.abs(reward_points[:, 0] - i) + np.abs(reward_points[:, 1] - j)
+        #         # 设置奖励值，距离越近奖励越高
+        #         if distances.size > 0:
+        #             reward_map_to_relic[i, j] = 1 / (1 + np.min(distances)) * 10
+        #         else:
+        #             # 处理 distances 为空的情况，例如设置默认值或跳过当前计算
+        #             reward_map_to_relic[i, j] = 0 
 
-        # 遍历每个单位
-        for unit_index in range(unit_num):
-            # 检查 mask 是否激活
-            if unit_mask[self.team_id, unit_index]:  # 如果存在单位
-                # 获取单位的位置
-                x, y = unit_positions[self.team_id, unit_index]
-                reward_return_list[unit_index] += reward_map_to_relic[x, y] #奖励趋向于遗迹点
+        # # 遍历每个单位
+        # for unit_index in range(unit_num):
+        #     # 检查 mask 是否激活
+        #     if unit_mask[self.team_id, unit_index]:  # 如果存在单位
+        #         # 获取单位的位置
+        #         x, y = unit_positions[self.team_id, unit_index]
+        #         reward_return_list[unit_index] += reward_map_to_relic[x, y] #奖励趋向于遗迹点
 
         # 偏向走向去遗迹点的奖励，通过差分奖励来实现，记录的是离奖励最近的智能体的距离，距离使用曼哈顿距离
 
-        # #------------------课程一的内容-------------
-        # # 预处理：提前计算所有奖励点的坐标
-        # reward_locations = np.argwhere(reward_map == 1)  # 获取所有奖励坐标
-        # go_reward_return = np.zeros((unit_num), dtype=np.float32)
+        #------------------课程一的内容-------------
+        # 预处理：提前计算所有奖励点的坐标
+        reward_locations = np.argwhere(reward_map == 1)  # 获取所有奖励坐标
+        go_reward_return = np.zeros((unit_num), dtype=np.float32)
  
-        # for xx, yy in reward_locations:
-        #     unit_reward = 0
-        #     unit_index_record = []
-        #     for unit_index in range(unit_num):
-        #         if unit_mask[self.team_id, unit_index]:
-        #             x, y = unit_positions[self.team_id, unit_index]
-        #             # 计算到所有奖励点的曼哈顿距离
-        #             distances = np.abs(xx-x) + np.abs(yy-y)
-        #             unit_reward_now = 1 / (1 + distances) * 200
-        #             if unit_reward_now > unit_reward:
-        #                 unit_reward = unit_reward_now
-        #                 unit_index_record = unit_index
-        #     go_reward_return[unit_index_record] = unit_reward
+        for xx, yy in reward_locations:
+            unit_reward = 0
+            unit_index_record = []
+            for unit_index in range(unit_num):
+                if unit_mask[self.team_id, unit_index]:
+                    x, y = unit_positions[self.team_id, unit_index]
+                    # 计算到所有奖励点的曼哈顿距离
+                    distances = np.abs(xx-x) + np.abs(yy-y)
+                    unit_reward_now = 1 / (1 + distances) * 200
+                    if unit_reward_now > unit_reward:
+                        unit_reward = unit_reward_now
+                        unit_index_record = unit_index
+            go_reward_return[unit_index_record] = unit_reward
 
-        # reward_return_list += go_reward_return #- self.go_reward_return_history
-        # self.go_reward_return_history = go_reward_return
+        reward_return_list += go_reward_return #- self.go_reward_return_history
+        self.go_reward_return_history = go_reward_return
 
         # #------------------能量变化给分-------------
         # # 能量变化得分 获得的能量-使用的能量
