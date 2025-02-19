@@ -4,7 +4,7 @@ import jax
 MAP_TYPES = ["dev0", "random"]
 
 
-@struct.dataclass
+@struct.dataclass(frozen=False)
 class EnvParams:
     max_steps_in_match: int = 100
     map_type: int = 1
