@@ -99,7 +99,7 @@ class ActorCriticNet(nn.Module):
         super(ActorCriticNet, self).__init__()
         self.device = device
         self.num_agents = 16  # 智能体数量
-        self.num_discrete_actions = 5  # 离散动作数量 (0-4)
+        self.num_discrete_actions = 5  # 离散动作数量 (0-4)+spa
         self.continuous_range = 8  
 
         self.initial_conv = nn.Conv2d(input_shape[0], 128, kernel_size=3, padding=1)
@@ -333,7 +333,7 @@ if __name__ == "__main__":
     num_actions = 3
 
     model = ActorCriticNet(input_shape, num_actions, device).to(device)
-    model.load_model('kits/python/actor_critic_model_1000.pth')
+    model.load_model('kits/python/actor_critic_model_1300.pth')
 
     for episode in range(2):
         next_obs, info = env.reset(seed=1, options=dict(params=env_params))
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         obs_data1, reward_return1, done, terminate = P_O1.process_observation(reshape_obs(next_obs['player_1']))
 
         while not terminate:
-            action0, _, state_value = select_action(model, obs_data0)
+            action0, _, _ = select_action(model, obs_data0)
             action1, _, _ = select_action(model, obs_data1)
             action = {'player_0': action0, 'player_1': action1}
             next_obs, _, _, _, _ = env.step(action)

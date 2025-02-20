@@ -272,7 +272,7 @@ class ProcessObservation:
         self.energies_self_last = np.zeros((24, 24, unit_num), dtype=np.float32)
         self.energies_opp_last = np.zeros((24, 24, unit_num), dtype=np.float32)
 
-    def process_observation(self, obs):
+    def process_observation(self, obs, actions=None):
         
         # --------------------------------- 时间信息 ---------------------------------
         steps = np.array(obs['steps'])  # 当前步骤数(总数)
@@ -417,6 +417,45 @@ class ProcessObservation:
         #         reward_return_list[unit_index] += reward_map_to_relic[x, y] #奖励趋向于遗迹点
 
         # 偏向走向去遗迹点的奖励，通过差分奖励来实现，记录的是离奖励最近的智能体的距离，距离使用曼哈顿距离
+
+        # 击败敌人给分，一种是逼死的，一种是spa死的，首先先判断对手的智能体是不是死亡。
+        # 逼死的第一种情况，在同一位置，并且能量比对方高。如果被对方怼死则惩罚（死了给奖励）
+        for unit_index in range(unit_num):
+                if unit_mask[self.team_id, unit_index]:  # 如果存在单位
+                    x, y = unit_positions[self.team_id, unit_index]
+                    for unit_index_opp in range(unit_num):
+                        if unit_mask[self.opp_team_id, unit_index_opp]:  # 如果存在单位
+                            x_opp, y_opp = unit_positions[self.opp_team_id, unit_index_opp]
+                            if x == x_opp and y == y_opp and unit_energies[self.team_id, unit_index] > unit_energies[self.opp_team_id, unit_index_opp]:
+                                reward_return_list[unit_index] += 100
+                            if x == x_opp and y == y_opp and unit_energies[self.team_id, unit_index] < unit_energies[self.opp_team_id, unit_index_opp]:
+                                reward_return_list[unit_index] -= 100
+
+        # 逼死的第二种情况，如果敌方单位死了，则我方单位在这个位置上下左右的单位都给奖励（不死也给奖励）
+        reward_2 = 10
+        for unit_index_opp in range(unit_num):
+            if unit_mask[self.opp_team_id, unit_index_opp]:
+                if unit_energies[self.opp_team_id, unit_index_opp] <= 0: #判断出来敌方单位死了
+                    x_opp, y_opp = unit_positions[self.opp_team_id, unit_index_opp]
+
+                    for unit_index in range(unit_num):
+                        if unit_mask[self.team_id, unit_index]:
+                            x, y = unit_positions[self.team_id, unit_index]
+                            if x == x_opp and y == y_opp:
+                                reward_return_list[unit_index] += reward_2
+                            if x == x_opp + 1 and y == y_opp:
+                                reward_return_list[unit_index] += reward_2
+                            if x == x_opp - 1 and y == y_opp:
+                                reward_return_list[unit_index] += reward_2
+                            if x == x_opp and y == y_opp + 1:
+                                reward_return_list[unit_index] += reward_2
+                            if x == x_opp and y == y_opp - 1:
+                                reward_return_list[unit_index] += reward_2
+
+        # 如果spa在了敌方单位附近的八个单位，那么就给奖励
+        # if actions is not None:
+        #     for unit_index in range(unit_num):
+        #         if actions[unit_index, 0] == :
 
         #------------------课程一的内容-------------
         # 预处理：提前计算所有奖励点的坐标

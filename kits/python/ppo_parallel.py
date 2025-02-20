@@ -102,8 +102,8 @@ def worker_process(rank, local_model, env_params, replay_queue, signal_queue, si
             action = {'player_0': action0, 'player_1': action1}
             next_obs, _, _, _, _ = env.step(action)
 
-            next_obs_data0, reward_return0, done, terminate = P_O0.process_observation(reshape_obs(next_obs['player_0']))
-            next_obs_data1, reward_return1, done, terminate = P_O1.process_observation(reshape_obs(next_obs['player_1']))
+            next_obs_data0, reward_return0, done, terminate = P_O0.process_observation(reshape_obs(next_obs['player_0']), action0)
+            next_obs_data1, reward_return1, done, terminate = P_O1.process_observation(reshape_obs(next_obs['player_1']), action1)
 
             reward0_total += reward_return0
 

@@ -20,8 +20,8 @@ class Agent():
         self.input_shape = (169, 24, 24)  
         self.num_actions = 3
         self.model = ActorCriticNet(self.input_shape, self.num_actions, self.device).to(self.device)
-        # self.model.load_model("/kaggle_simulations/agent/actor_critic_model_1000.pth", map_location='cpu')
-        self.model.load_model("actor_critic_model_1000.pth", map_location='cpu')
+        self.model.load_model("/kaggle_simulations/agent/actor_critic_model_1300.pth", map_location='cpu')
+        # self.model.load_model("actor_critic_model_1000.pth", map_location='cpu')
 
         self.relic_node_positions = []
         self.discovered_relic_nodes_ids = set()
