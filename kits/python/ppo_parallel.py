@@ -75,15 +75,15 @@ def worker_process(rank, local_model, env_params, replay_queue, signal_queue, si
     torch.manual_seed(rank)
     env = LuxAIS3GymEnv()
     # env = RecordEpisode(env, save_dir=f"episodes_worker_{rank}")
-    inner_model = ActorCriticNet(input_shape=(169, 24, 24), num_actions=3, device="cuda").to("cuda")
+    inner_model = ActorCriticNet(input_shape=(170, 24, 24), num_actions=3, device="cuda").to("cuda")
 
     while True:
         # 重置环境
         reward0_total = 0
-        P_O0 = ProcessObservation(0, 1)
-        P_O1 = ProcessObservation(1, 0)
         inner_model.load_state_dict(local_model.state_dict())
         RandomizedEnvParams(env_params) # 随机化环境参数
+        P_O0 = ProcessObservation(0, 1, env_params)
+        P_O1 = ProcessObservation(1, 0, env_params)
 
         obs, info = env.reset(seed=random.randint(0, 1e5), options=dict(params=env_params)) #random.randint(0, 1e5)
         obs_data0, reward_return0, done, terminate = P_O0.process_observation(reshape_obs(obs['player_0']))
@@ -156,7 +156,7 @@ import copy
 def main():
     # 初始化环境参数和模型
     env_params = EnvParams(map_type=0, max_steps_in_match=100)
-    num_workers = 7  # 子进程数量
+    num_workers = 1 #7  # 子进程数量
     replay_queue = mp.Queue()  # 数据队列
     signal_queue = mp.Queue(maxsize=num_workers)  # 数据队列
     signal_load_queue = mp.Queue(maxsize=num_workers)  # 数据队列
@@ -166,9 +166,9 @@ def main():
     print(f"Using device: {device}")
 
     # 初始化模型
-    model = ActorCriticNet(input_shape=(169, 24, 24), num_actions=3, device=device).to(device)
+    model = ActorCriticNet(input_shape=(170, 24, 24), num_actions=3, device=device).to(device)
     # model.load_model('LUX/kits/python/actor_critic_model_1000.pth')
-    local_model = ActorCriticNet(input_shape=(169, 24, 24), num_actions=3, device="cpu")
+    local_model = ActorCriticNet(input_shape=(170, 24, 24), num_actions=3, device="cpu")
     local_model.load_state_dict(model.state_dict())
     local_model.share_memory()  # 共享模型参数
     

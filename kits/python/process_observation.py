@@ -254,7 +254,7 @@ class MinimalRelicRewardTracker:
 
 
 class ProcessObservation:
-    def __init__(self, team_id, opp_team_id):
+    def __init__(self, team_id, opp_team_id, env_cfg):
         self.relic_reward_tracker = MinimalRelicRewardTracker()
         self.map_tracker = MapTracker()
         self.team_id = team_id
@@ -263,6 +263,11 @@ class ProcessObservation:
         self.see_relic_history = 0
         self.see_relic_reward_history = 0
         self.explore_history = 0
+        try:
+            self.unit_sap_range = env_cfg["unit_sap_range"]
+        except TypeError:
+            self.unit_sap_range = env_cfg.unit_sap_range
+        self.position_relic_unit_binding = np.zeros((24, 24, 1), dtype=np.int32)
         self.go_reward_return_history = np.zeros((unit_num), dtype=np.float32)
         self.unit_energy_history = {}
         self.position_self_last = np.zeros((24, 24, unit_num), dtype=np.int32)
@@ -281,6 +286,8 @@ class ProcessObservation:
         steps_state = np.ones((24, 24, 1), dtype=np.float32)
         match_steps_state = match_steps_state * match_steps / 100.0
         steps_state = steps_state *steps /505.0
+        sap_range = np.ones((24, 24, 1), dtype=np.float32) * self.unit_sap_range
+        sap_range_state = sap_range
 
         if steps == 505:
             terminate = True
@@ -333,6 +340,7 @@ class ProcessObservation:
         energies_opp = energies_opp / 400.0 
 
         position_data = np.dstack((self.position_self_last_last,self.position_self_last,position_self,self.energies_self_last,energies_self,self.position_opp_last_last,self.position_opp_last,position_opp,self.energies_opp_last,energies_opp))
+        # position_data = np.dstack((self.position_self_last,position_self,self.energies_self_last,energies_self,self.position_opp_last,position_opp,self.energies_opp_last,energies_opp))
         self.position_self_last_last = self.position_self_last 
         self.position_self_last = position_self
 
@@ -350,7 +358,7 @@ class ProcessObservation:
         reward_map = self.relic_reward_tracker.get_reward_nodes()
 
         # --------------------------------- 拼接数据 ---------------------------------
-        obs_data = np.dstack((match_steps_state, steps_state, position_data, map_data, relic_map, reward_map))
+        obs_data = np.dstack((match_steps_state, steps_state, sap_range_state, position_data, map_data, relic_map, reward_map))
 
         # --------------------------------- 团队信息计算奖励 ---------------------------------
         # 提取团队信息
@@ -359,7 +367,8 @@ class ProcessObservation:
 
         # 队伍总得分的奖励
         reward_return_list = np.zeros((unit_num), dtype=np.float32)
-
+        # if self.team_id == 0:
+        #     print(reward_map)
         #------------------经过测试，探索未知给分的奖励并没有任何作用-------------
 
         # # 全部都有的奖励
@@ -419,20 +428,8 @@ class ProcessObservation:
         # 偏向走向去遗迹点的奖励，通过差分奖励来实现，记录的是离奖励最近的智能体的距离，距离使用曼哈顿距离
 
         # 击败敌人给分，一种是逼死的，一种是spa死的，首先先判断对手的智能体是不是死亡。
-        # 逼死的第一种情况，在同一位置，并且能量比对方高。如果被对方怼死则惩罚（死了给奖励）
-        for unit_index in range(unit_num):
-                if unit_mask[self.team_id, unit_index]:  # 如果存在单位
-                    x, y = unit_positions[self.team_id, unit_index]
-                    for unit_index_opp in range(unit_num):
-                        if unit_mask[self.opp_team_id, unit_index_opp]:  # 如果存在单位
-                            x_opp, y_opp = unit_positions[self.opp_team_id, unit_index_opp]
-                            if x == x_opp and y == y_opp and unit_energies[self.team_id, unit_index] > unit_energies[self.opp_team_id, unit_index_opp]:
-                                reward_return_list[unit_index] += 100
-                            if x == x_opp and y == y_opp and unit_energies[self.team_id, unit_index] < unit_energies[self.opp_team_id, unit_index_opp]:
-                                reward_return_list[unit_index] -= 100
-
-        # 逼死的第二种情况，如果敌方单位死了，则我方单位在这个位置上下左右的单位都给奖励（不死也给奖励）
-        reward_2 = 10
+        # 逼死的第二种情况，如果敌方单位死了，则我方单位在这个位置上下左右的单位都给奖励
+        reward_2 = 200
         for unit_index_opp in range(unit_num):
             if unit_mask[self.opp_team_id, unit_index_opp]:
                 if unit_energies[self.opp_team_id, unit_index_opp] <= 0: #判断出来敌方单位死了
@@ -452,32 +449,88 @@ class ProcessObservation:
                             if x == x_opp and y == y_opp - 1:
                                 reward_return_list[unit_index] += reward_2
 
-        # 如果spa在了敌方单位附近的八个单位，那么就给奖励
-        # if actions is not None:
-        #     for unit_index in range(unit_num):
-        #         if actions[unit_index, 0] == :
+        # 如果spa在了敌方单位附近的八个单位，那么就给奖励，后六个智能体主攻攻击
+        reward_3 = 400
+        if actions is not None:
+            for unit_index in range(unit_num):
+                if unit_index >= 6:
+                    if actions[unit_index, 0] == 5: #如果是spa动作
+                        if abs(actions[unit_index, 1])<=self.unit_sap_range and abs(actions[unit_index, 2])<=self.unit_sap_range:
+                            # 因为spa不会移动，因此可以直接用这次的位置判断
+                            x, y = unit_positions[self.team_id, unit_index]
+                            x = x + actions[unit_index, 1]
+                            y = y + actions[unit_index, 2]
+                            # 能看到的敌方单位
+                            for unit_index_opp in range(unit_num):
+                                if unit_mask[self.opp_team_id, unit_index_opp]:
+                                    x_opp, y_opp = unit_positions[self.opp_team_id, unit_index_opp]
+                                    if x == x_opp and y == y_opp:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp + 1 and y == y_opp:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp - 1 and y == y_opp:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp and y == y_opp + 1:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp and y == y_opp - 1:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp + 1 and y == y_opp + 1:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp + 1 and y == y_opp - 1:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp - 1 and y == y_opp + 1:
+                                        reward_return_list[unit_index] += reward_3
+                                    if x == x_opp - 1 and y == y_opp - 1:
+                                        reward_return_list[unit_index] += reward_3
+                        else: #超出spa范围
+                            reward_return_list[unit_index] -= reward_3/2
+                else:
+                    if actions[unit_index, 0] == 5: #如果是spa动作,0-5智能体做会受到惩罚，他们不可以做spa动作
+                        reward_return_list[unit_index] -= reward_3/2
 
-        #------------------课程一的内容-------------
         # 预处理：提前计算所有奖励点的坐标
         reward_locations = np.argwhere(reward_map == 1)  # 获取所有奖励坐标
         go_reward_return = np.zeros((unit_num), dtype=np.float32)
- 
+        go_reward_mask = np.ones((unit_num), dtype=np.int8) #防止多次给奖励
+
         for xx, yy in reward_locations:
             unit_reward = 0
             unit_index_record = []
             for unit_index in range(unit_num):
-                if unit_mask[self.team_id, unit_index]:
+                if unit_mask[self.team_id, unit_index] and go_reward_mask[unit_index] == 1:
                     x, y = unit_positions[self.team_id, unit_index]
                     # 计算到所有奖励点的曼哈顿距离
                     distances = np.abs(xx-x) + np.abs(yy-y)
-                    unit_reward_now = 1 / (1 + distances) * 200
+
+                    if self.team_id == 0:
+                        if xx + yy <= 23:
+                            unit_reward_now = 1 / (1 + distances) * 200
+                        else:
+                            unit_reward_now = 1 / (1 + distances) * 50
+                    else:
+                        if xx + yy >= 23:
+                            unit_reward_now = 1 / (1 + distances) * 200
+                        else:
+                            unit_reward_now = 1 / (1 + distances) * 50
+
                     if unit_reward_now > unit_reward:
                         unit_reward = unit_reward_now
                         unit_index_record = unit_index
             go_reward_return[unit_index_record] = unit_reward
-
+            go_reward_mask[unit_index_record] = 0
+            
         reward_return_list += go_reward_return #- self.go_reward_return_history
         self.go_reward_return_history = go_reward_return
+
+        # # 重叠在一起就惩罚
+        # unique_positions, counts = np.unique(unit_positions[self.team_id], axis=0, return_counts=True)
+        # for pos, count in zip(unique_positions, counts):
+        #     if count > 1:  # 如果有多个单位在同一位置
+        #         for unit_index in range(unit_num):
+        #             if unit_mask[self.team_id, unit_index]:
+        #                 x, y = unit_positions[self.team_id, unit_index]
+        #                 if (x, y) == tuple(pos):
+        #                     reward_return_list[unit_index] -= 200
 
         # #------------------能量变化给分-------------
         # # 能量变化得分 获得的能量-使用的能量

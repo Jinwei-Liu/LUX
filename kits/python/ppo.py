@@ -99,7 +99,7 @@ class ActorCriticNet(nn.Module):
         super(ActorCriticNet, self).__init__()
         self.device = device
         self.num_agents = 16  # 智能体数量
-        self.num_discrete_actions = 5  # 离散动作数量 (0-4)+spa
+        self.num_discrete_actions = 6  # 离散动作数量 (0-4)+spa
         self.continuous_range = 8  
 
         self.initial_conv = nn.Conv2d(input_shape[0], 128, kernel_size=3, padding=1)
@@ -238,10 +238,10 @@ def train_actor_critic(model, optimizer, replay_buffer, batch_size, gamma=0.95, 
     entropy_cont2 = -(log_probs_cont2 * torch.exp(log_probs_cont2)).sum(dim=-1).mean()
 
     # 总熵
-    total_entropy = entropy_discrete #+ entropy_cont1 + entropy_cont2
+    total_entropy = entropy_discrete + entropy_cont1 + entropy_cont2
 
     # 总损失
-    actor_loss = discrete_loss #+ continuous_loss_1 + continuous_loss_2
+    actor_loss = discrete_loss + continuous_loss_1 + continuous_loss_2
     total_loss = actor_loss + critic_loss - total_entropy * entropy_coef 
 
     # 反向传播和优化
@@ -317,7 +317,6 @@ def select_action_deterministic(model, state):
     actions = actions.detach().squeeze(0).cpu().numpy()  # 使用 .cpu() 移到 CPU 并转换为 NumPy 数组
     return actions,0,0
 
-
 if __name__ == "__main__":
     # 检查是否有 GPU 可用
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -329,16 +328,16 @@ if __name__ == "__main__":
     env_params = EnvParams(map_type=0, max_steps_in_match=100)
     RandomizedEnvParams(env_params)
     
-    input_shape = (169, 24, 24)  # 更新此形状以适应环境
+    input_shape = (170, 24, 24)  # 更新此形状以适应环境
     num_actions = 3
 
     model = ActorCriticNet(input_shape, num_actions, device).to(device)
-    model.load_model('kits/python/actor_critic_model_1300.pth')
+    model.load_model('kits/python/actor_critic_model_200.pth')
 
-    for episode in range(2):
+    for episode in range(1):
         next_obs, info = env.reset(seed=1, options=dict(params=env_params))
-        P_O0 = ProcessObservation(0,1)
-        P_O1 = ProcessObservation(1,0)
+        P_O0 = ProcessObservation(0,1, env_params)
+        P_O1 = ProcessObservation(1,0, env_params)
         obs_data0, reward_return0, done, terminate = P_O0.process_observation(reshape_obs(next_obs['player_0']))
         obs_data1, reward_return1, done, terminate = P_O1.process_observation(reshape_obs(next_obs['player_1']))
 
@@ -352,5 +351,6 @@ if __name__ == "__main__":
             obs_data1, reward_return1, done, terminate = P_O1.process_observation(reshape_obs(next_obs['player_1']))
 
             env.render()
+            time.sleep(0.1)
 
     env.close()
